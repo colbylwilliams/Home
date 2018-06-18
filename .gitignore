@@ -3,3 +3,7 @@ node_modules/
 package-lock.json
 .DS_Store
 publish.js
+*.dispatch
+data
+Summary.html
+homebotdispatch.json
