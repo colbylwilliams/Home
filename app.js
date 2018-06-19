@@ -45,7 +45,7 @@ const homebotQna = new QnAMaker({
 
 
 // Add cState middleware
-const storage = process.env.UseTableStorageForConversationState === 'true' ? new TableStorage({ tablename: 'botstate', storageAccountOrConnectionString: process.env.AzureWebJobsStorage }) : new MemoryStorage();
+const storage = process.env.UseTableStorageForConversationState === 'true' ? new TableStorage({ tableName: 'botstate', storageAccountOrConnectionString: process.env.AzureWebJobsStorage }) : new MemoryStorage();
 
 const conversationState = new ConversationState(storage);
 const userState = new UserState(storage);
