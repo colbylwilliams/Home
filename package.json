@@ -11,6 +11,7 @@
   "dependencies": {
     "botbuilder": "^4.0.0-preview1.0",
     "botbuilder-ai": "^4.0.0-preview1.0",
+    "botbuilder-azure": "^4.0.0-preview1.0",
     "botbuilder-dialogs": "^4.0.0-preview1.0",
     "botdispatch": "^0.0.3",
     "restify": "^7.1.1"
