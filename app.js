@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-const { BotStateSet, BotFrameworkAdapter, MemoryStorage, ConversationState, TurnContext, UserState } = require('botbuilder');
+const { BotStateSet, BotFrameworkAdapter, MemoryStorage, ConversationState, UserState } = require('botbuilder');
 const { LuisRecognizer, QnAMaker } = require('botbuilder-ai');
 const { DialogSet } = require('botbuilder-dialogs');
 const restify = require('restify');
