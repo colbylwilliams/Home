@@ -9,7 +9,7 @@ const restify = require('restify');
 
 
 let server = restify.createServer();
-server.listen(process.env.port || process.env.PORT || 3978, function () {
+server.listen(process.env.port || process.env.PORT || 3978, () => {
     console.log(`${server.name} listening to ${server.url}`);
 });
 
@@ -71,6 +71,11 @@ dialogs.add('property_feedback', new customDialogs.PropertyFeedback(conversation
 dialogs.add('None', new customDialogs.NoneIntent(conversationState, userState));
 
 
+
+//-----------------------------------------------
+// Requests
+//-----------------------------------------------
+
 server.post('/api/messages', (req, res) => {
     adapter.processActivity(req, res, async (context) => {
         
@@ -96,11 +101,7 @@ server.post('/api/messages', (req, res) => {
 
                     } else {
 
-                        // Retrieve the LUIS results from our dispatcher LUIS application
-                        const dispatchLuisResults = await dispatcher.recognize(context);
-
-                        // Extract the top intent from LUIS and use it to select which LUIS application to dispatch to
-                        const topIntent = LuisRecognizer.topIntent(dispatchLuisResults);
+                        const topIntent = LuisRecognizer.topIntent(await dispatcher.recognize(context));
 
                         switch (topIntent) {
                             case 'l_homebot':
@@ -109,7 +110,10 @@ server.post('/api/messages', (req, res) => {
                                 await dc.begin(topHomebotLuisIntent, homebotLuisResults);
                                 break;
                             case 'q_homebotqna':
-                                await homebotQna.answer(context);
+                                if (!await homebotQna.answer(context)) {
+                                    await dc.context.sendActivity(`Sorry, couldn't find an answer to that particilar question.\nYou can reach the office at (123) 456-7890 for more information.`);
+                                    await dc.end()
+                                }
                                 break;
                             default:
                                 await dc.begin('None');
@@ -129,7 +133,7 @@ server.post('/api/messages', (req, res) => {
                     if (uState.userInfo === undefined) {
                         await dc.begin('getUserInfo');
                     } else {
-                        await dc.context.sendActivity(`Welcome back ${uState.userInfo.userName}! Just a reminder, I can help with you with issues, feedback, and general information about your home.`);
+                        await dc.context.sendActivity(`Welcome back ${uState.userInfo.userName}! Just a reminder, I can help with reporting issues, taking feedback and/or complaints, and answering questions about your home and the property.`);
                     }
                 }
                 break;
@@ -169,7 +173,7 @@ server.post('/api/messages', (req, res) => {
             console.log('continue...');
             await dc.continue();
             if (!context.responded && isMessage) {
-                await dc.context.sendActivity(`Howdy, I'm HomeBot! I can help with you with issues, feedback, and general information about your home.`);
+                await dc.context.sendActivity(`Howdy, I'm HomeBot! I can help with reporting issues, taking feedback and/or complaints, and answering questions about your home and the property.`);
             }
         }        
     });

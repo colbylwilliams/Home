@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
 const { DialogContainer, TextPrompt, ConfirmPrompt } = require('botbuilder-dialogs');
 
 // Helper function to retrieve specific entities from LUIS results
@@ -15,7 +18,7 @@ async function userNameValidator(context, value) {
     if (value && /^[a-zA-Z ]{2,30}$/.test(value)) {
         return value;
     }
-    await context.sendActivity(`Your entry must be between 2 and 30 characters in length and only contain letters and whitespace.`);
+    await context.sendActivity(`To ensure uniqueness please provide a name (or nickname) between 2 and 30 characters long that only contains letters and spaces.`);
     return undefined;
 }
 
@@ -23,7 +26,7 @@ async function unitNumberValidator(context, value) {
     if (value && /^[0-9A-Z]{2,6}$/.test(value.toUpperCase())) {
         return value.toUpperCase();
     }
-    await context.sendActivity(`Your entry must be between 2 and 6 characters in length and only contain numbers and letters.`);
+    await context.sendActivity(`Unit numbers are between 2 and 6 characters long and only contain numbers and letters (no spaces).`);
     return undefined;
 }
 
@@ -56,8 +59,8 @@ class GetUserInfo extends DialogContainer {
                 const uState = userState.get(dc.context);
                 uState.userInfo = dc.activeDialog.state.userInfo;
 
-                await dc.context.sendActivity(`Perfect.  That's all the information I need to start helping you with issues, feedback, and general information about your home. All you have to do is ask.`);
-
+                await dc.context.sendActivity(`Perfect.  That's all the information I need.`);
+                await dc.context.sendActivity(`I'm here to help with reporting issues, taking feedback and/or complaints, and answering questions about your home and the property.`);
                 conversationState.get(dc.context).activeFlow = false;
 
                 await dc.end();
