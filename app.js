@@ -4,23 +4,25 @@
 const { MessageFactory, BotStateSet, BotFrameworkAdapter, MemoryStorage, ConversationState, UserState } = require('botbuilder');
 const { LuisRecognizer, QnAMaker } = require('botbuilder-ai');
 // const { CosmosDbStorage, TableStorage, BlobStorage } = require('botbuilder-azure');
-const { DialogSet, TextPrompt, DatetimePrompt, ConfirmPrompt, NumberPrompt } = require('botbuilder-dialogs');
+const { DialogSet } = require('botbuilder-dialogs');
 const restify = require('restify');
 
-// Create server
+
 let server = restify.createServer();
 server.listen(process.env.port || process.env.PORT || 3978, function () {
     console.log(`${server.name} listening to ${server.url}`);
 });
 
-// Create adapter
 const adapter = new BotFrameworkAdapter({
     appId: process.env.MicrosoftAppId,
     appPassword: process.env.MicrosoftAppPassword
 });
 
 
-// Dispatcher LUIS application
+//-----------------------------------------------
+// LuisRecognizers & QnA
+//-----------------------------------------------
+
 const dispatcher = new LuisRecognizer({
     appId: 'c6e704f8-fc79-46d5-8035-a871692d8446',
     subscriptionKey: process.env.LuisSubscriptionKey,
@@ -28,7 +30,6 @@ const dispatcher = new LuisRecognizer({
     verbose: true
 });
 
-// Main LUIS application
 const homebotLuis = new LuisRecognizer({
     appId: '53caa4fb-4206-4060-8eb7-9bca97138618',
     subscriptionKey: process.env.LuisSubscriptionKey,
@@ -36,7 +37,6 @@ const homebotLuis = new LuisRecognizer({
     verbose: true
 });
 
-// QnAMaker knowledge base
 const homebotQna = new QnAMaker({
     knowledgeBaseId: 'ff1a599c-9b79-41b7-b65a-32c477f6ba85',
     endpointKey: process.env.QnaEndpointKey,
@@ -44,139 +44,34 @@ const homebotQna = new QnAMaker({
 },{ answerBeforeNext: true });
 
 
-// Add cState middleware
+
+//-----------------------------------------------
+// Middleware
+//-----------------------------------------------
+
 // const storage = process.env.UseTableStorageForConversationState === 'true' ? new BlobStorage({ containerName: 'botstate', storageAccountOrConnectionString: process.env.AzureWebJobsStorage }) : new MemoryStorage();
 const storage = new MemoryStorage();
-
 const conversationState = new ConversationState(storage);
 const userState = new UserState(storage);
-
 adapter.use(new BotStateSet(conversationState, userState));
 
-// Register some dialogs for usage with the LUIS apps that are being dispatched to
+
+
+//-----------------------------------------------
+// Dialogs
+//-----------------------------------------------
+
 const dialogs = new DialogSet();
 
+const customDialogs = require("./dialogs");
 
-// Helper function to retrieve specific entities from LUIS results
-function findEntities(entityName, entityResults) {
-    let entities = []
-    if (entityName in entityResults) {
-        entityResults[entityName].forEach(entity => {
-            entities.push(entity);
-        });
-    }
-    return entities.length > 0 ? entities : undefined;
-}
+dialogs.add('getUserInfo', new customDialogs.GetUserInfo(conversationState, userState));
+dialogs.add('property_maintenance', new customDialogs.PropertyMaintenance(conversationState, userState));
+dialogs.add('property_feedback', new customDialogs.PropertyFeedback(conversationState, userState));
+dialogs.add('None', new customDialogs.NoneIntent(conversationState, userState));
 
-//-----------------------------------------------
-// Luis Intent Dialogs
-//-----------------------------------------------
 
-dialogs.add('textPrompt', new TextPrompt());
-dialogs.add('numberPrompt', new NumberPrompt());
-dialogs.add('confirmPrompt', new ConfirmPrompt());
-dialogs.add('datetimePrompt', new DatetimePrompt());
-
-dialogs.add('getUserInfo', [
-    async (dc, args, next) => {
-
-        conversationState.get(dc.context).activeFlow = true
-        
-        dc.activeDialog.state.userInfo = {}; // Clears any previous data
-        
-        await dc.context.sendActivity(`Howdy 👋 , I'm HomeBot!`);
-        await dc.prompt('textPrompt', `What should I call you?`);
-    },
-    async (dc, userName) => {
-        
-        dc.activeDialog.state.userInfo.userName = userName;
-        
-        await dc.context.sendActivity(`Very nice to meet you ${userName}!`);
-        await dc.prompt('textPrompt', `Which unit are you in?`);
-    },
-    async (dc, unitNumber) => {
-
-        dc.activeDialog.state.userInfo.unitNumber = unitNumber;
-        
-        const uState = userState.get(dc.context);
-        uState.userInfo = dc.activeDialog.state.userInfo;
-
-        await dc.context.sendActivity(`Perfect.  That's all the information I need to start helping you with issues, feedback, and general information about your home. All you have to do is ask.`);
-        
-        conversationState.get(dc.context).activeFlow = false
-        
-        await dc.end();        
-    }
-]);
-
-dialogs.add('property_maintenance', [
-    async (dc, args, next) => {
-        
-        conversationState.get(dc.context).activeFlow = true
-        
-        const appliances = findEntities('maintenance_appliance', args.entities);
-        const issues = findEntities('maintenance_issue', args.entities);
-        
-        dc.activeDialog.state.maintenanceRequest = {}
-        
-        if (appliances && issues) {
-            dc.activeDialog.state.maintenanceRequest.appliance = appliances[0]
-            dc.activeDialog.state.maintenanceRequest.issue = issues[0]
-            dc.activeDialog.state.maintenanceRequest.confirming = true
-            
-            await dc.context.sendActivity(`Hello, I understand your ${appliances[0]} requires maintenance for an issue described as: '${issues[0]}'`);
-        } else {
-            await dc.context.sendActivity(`Hello, I understand require maintenance?`);
-        }
-        await dc.prompt('confirmPrompt', 'Is this correct?');
-    },
-    async (dc, confimation) => {
-        
-        await dc.context.sendActivity(`Thanks for replying with: ${confimation}`)
-        
-        conversationState.get(dc.context).activeFlow = false
-        
-        await dc.end()
-    }
-]);
-
-dialogs.add('property_feedback', [
-    async (dc, args) => {
-
-        conversationState.get(dc.context).activeFlow = true
-
-        const appliances = findEntities('appliance::', args.entities);
-
-        const cState = conversationState.get(dc.context);
-        cState.propertyFeedback = cState.propertyFeedback ? cState.propertyFeedback + 1 : 1;
-        await dc.context.sendActivity(`${state.propertyFeedback}: You reached the "property_feedback" dialog.`);
-        if (appliances) {
-            await dc.context.sendActivity(`Found these "appliances" entities:\n${appliances.join(', ')}`);
-        }
-
-        conversationState.get(dc.context).activeFlow = false
-
-        await dc.end();
-    }
-]);
-
-dialogs.add('None', [
-    async (dc) => {
-        conversationState.get(dc.context).activeFlow = true
-        const cState = conversationState.get(dc.context);
-        cState.noneIntent = cState.noneIntent ? cState.noneIntent + 1 : 1;
-        await dc.context.sendActivity(`${state.noneIntent}: You reached the "None" dialog.`);
-        conversationState.get(dc.context).activeFlow = false
-        await dc.end();
-    }
-]);
-
-// todo: https://docs.microsoft.com/en-us/azure/bot-service/bot-builder-prompts?view=azure-bot-service-4.0&tabs=javascript#validate-a-prompt-response
-// todo: https://docs.microsoft.com/en-us/azure/bot-service/bot-service-activities-entities?view=azure-bot-service-4.0&tabs=js#activity-types
-
-// Listen for incoming requests 
 server.post('/api/messages', (req, res) => {
-    // Route received request to adapter for processing
     adapter.processActivity(req, res, async (context) => {
         
         var isMessage = false
@@ -271,10 +166,9 @@ server.post('/api/messages', (req, res) => {
         }
 
         if (!context.responded) {
-            console.log('continue 0');
+            console.log('continue...');
             await dc.continue();
             if (!context.responded && isMessage) {
-                console.log('continue 1');
                 await dc.context.sendActivity(`Howdy, I'm HomeBot! I can help with you with issues, feedback, and general information about your home.`);
             }
         }        
