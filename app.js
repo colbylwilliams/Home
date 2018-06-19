@@ -3,7 +3,7 @@
 
 const { MessageFactory, BotStateSet, BotFrameworkAdapter, MemoryStorage, ConversationState, UserState } = require('botbuilder');
 const { LuisRecognizer, QnAMaker } = require('botbuilder-ai');
-const { TableStorage } = require('botbuilder-azure');
+// const { CosmosDbStorage, TableStorage, BlobStorage } = require('botbuilder-azure');
 const { DialogSet, TextPrompt, DatetimePrompt, ConfirmPrompt, NumberPrompt } = require('botbuilder-dialogs');
 const restify = require('restify');
 
@@ -45,7 +45,8 @@ const homebotQna = new QnAMaker({
 
 
 // Add cState middleware
-const storage = process.env.UseTableStorageForConversationState === 'true' ? new TableStorage({ tableName: 'botstate', storageAccountOrConnectionString: process.env.AzureWebJobsStorage }) : new MemoryStorage();
+// const storage = process.env.UseTableStorageForConversationState === 'true' ? new BlobStorage({ containerName: 'botstate', storageAccountOrConnectionString: process.env.AzureWebJobsStorage }) : new MemoryStorage();
+const storage = new MemoryStorage();
 
 const conversationState = new ConversationState(storage);
 const userState = new UserState(storage);
@@ -171,67 +172,111 @@ dialogs.add('None', [
 ]);
 
 // todo: https://docs.microsoft.com/en-us/azure/bot-service/bot-builder-prompts?view=azure-bot-service-4.0&tabs=javascript#validate-a-prompt-response
+// todo: https://docs.microsoft.com/en-us/azure/bot-service/bot-service-activities-entities?view=azure-bot-service-4.0&tabs=js#activity-types
 
 // Listen for incoming requests 
 server.post('/api/messages', (req, res) => {
     // Route received request to adapter for processing
     adapter.processActivity(req, res, async (context) => {
         
-        const isMessage = context.activity.type === 'message';
-        
-        
+        var isMessage = false
+
         const uState = userState.get(context);
         const cState = conversationState.get(context);
         const dc = dialogs.createContext(context, cState);
-        
+
         const activeFlow = cState.activeFlow === true;
 
-        if (isMessage && !activeFlow) {
 
-            if (uState.userInfo === undefined) {
-            
-                await dc.begin('getUserInfo');
-            
-            } else {
-                
-                // Retrieve the LUIS results from our dispatcher LUIS application
-                const dispatchLuisResults = await dispatcher.recognize(context);
-                
-                // Extract the top intent from LUIS and use it to select which LUIS application to dispatch to
-                const topIntent = LuisRecognizer.topIntent(dispatchLuisResults);
+        switch (context.activity.type) {
+            case 'message':
+                console.log('message');
+                isMessage = true
+                // Represents a communication between bot and user.
+                if (!activeFlow) {
 
-                switch (topIntent) {
-                    case 'l_homebot':
-                        const homebotLuisResults = await homebotLuis.recognize(context);
-                        const topHomebotLuisIntent = LuisRecognizer.topIntent(homebotLuisResults);
-                        await dc.begin(topHomebotLuisIntent, homebotLuisResults);
-                        break;
-                    case 'q_homebotqna':
-                        await homebotQna.answer(context);
-                        break;
-                    default:
-                        await dc.begin('None');
+                    if (uState.userInfo === undefined) {
+
+                        await dc.begin('getUserInfo');
+
+                    } else {
+
+                        // Retrieve the LUIS results from our dispatcher LUIS application
+                        const dispatchLuisResults = await dispatcher.recognize(context);
+
+                        // Extract the top intent from LUIS and use it to select which LUIS application to dispatch to
+                        const topIntent = LuisRecognizer.topIntent(dispatchLuisResults);
+
+                        switch (topIntent) {
+                            case 'l_homebot':
+                                const homebotLuisResults = await homebotLuis.recognize(context);
+                                const topHomebotLuisIntent = LuisRecognizer.topIntent(homebotLuisResults);
+                                await dc.begin(topHomebotLuisIntent, homebotLuisResults);
+                                break;
+                            case 'q_homebotqna':
+                                await homebotQna.answer(context);
+                                break;
+                            default:
+                                await dc.begin('None');
+                        }
+                    }
                 }
-            }
+                break;
+            case 'contactRelationUpdate':
+                // Indicates that the bot was added or removed from a user's contact list.
+                console.log('contactRelationUpdate');
+                break;
+            case 'conversationUpdate':
+                // Indicates that the bot was added to a conversation, other members were
+                // added to or removed from the conversation, or conversation metadata has changed.
+                console.log('conversationUpdate');
+                if (!activeFlow && context.activity.membersAdded[0].name !== 'Bot') {
+                    if (uState.userInfo === undefined) {
+                        await dc.begin('getUserInfo');
+                    } else {
+                        await dc.context.sendActivity(`Welcome back ${uState.userInfo.userName}! Just a reminder, I can help with you with issues, feedback, and general information about your home.`);
+                    }
+                }
+                break;
+            case 'deleteUserData':
+                // Indicates to a bot that a user has requested that the bot delete any user data it may have stored.
+                console.log('deleteUserData');
+                break;
+            case 'endOfConversation':
+                // Indicates the end of a conversation.
+                console.log('endOfConversation');
+                break;
+            case 'event':
+                // Represents a communication sent to a bot that is not visible to the user.
+                console.log('event');
+                break;
+            case 'invoke':
+                // Represents a communication sent to a bot to request that it perform a specific operation. 
+                console.log('invoke');
+                // This activity type is reserved for internal use by the Microsoft Bot Framework.
+                break;
+            case 'messageReaction':
+                // Indicates that a user has reacted to an existing activity. 
+                console.log('messageReaction');
+                // For example, a user clicks the "Like" button on a message.
+                break;
+            case 'ping':
+                // Represents an attempt to determine whether a bot's endpoint is accessible.
+                console.log('ping');
+                break;
+            case 'typing':
+                // Indicates that the user or bot on the other end of the conversation is compiling a response.
+                console.log('typing');
+                break;
         }
 
         if (!context.responded) {
-            console.log('continue');
+            console.log('continue 0');
             await dc.continue();
             if (!context.responded && isMessage) {
+                console.log('continue 1');
                 await dc.context.sendActivity(`Howdy, I'm HomeBot! I can help with you with issues, feedback, and general information about your home.`);
             }
-        }
-        
-        if (context.activity.type === 'conversationUpdate' && !activeFlow && context.activity.membersAdded[0].name !== 'Bot') {
-            if (uState.userInfo === undefined) {
-                await dc.begin('getUserInfo');
-            } else {
-                await dc.context.sendActivity(`Welcome back ${uState.userInfo.userName}! Just a reminder, I can help with you with issues, feedback, and general information about your home.`);
-            }
-        }
-        //  else if (context.activity.type === 'conversationUpdate' && context.activity.membersAdded[0].name !== 'Bot') {
-        //     await dc.begin('getUserInfo');
-        // }
+        }        
     });
 });
