@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 const { MessageFactory, BotStateSet, BotFrameworkAdapter, MemoryStorage, ConversationState, UserState } = require('botbuilder');
-const { LuisRecognizer, QnAMaker } = require('botbuilder-ai');
+const { LuisRecognizer, QnAMaker, LanguageTranslator, LocaleConverter } = require('botbuilder-ai');
 // const { CosmosDbStorage, TableStorage, BlobStorage } = require('botbuilder-azure');
 const { DialogSet } = require('botbuilder-dialogs');
 const restify = require('restify');
@@ -17,6 +17,20 @@ const adapter = new BotFrameworkAdapter({
     appId: process.env.MicrosoftAppId,
     appPassword: process.env.MicrosoftAppPassword
 });
+
+
+//-----------------------------------------------
+// Translator
+//-----------------------------------------------
+
+const languageTranslator = new LanguageTranslator({
+    translatorKey: process.env.MicrosoftTranslatorKey,
+    noTranslatePatterns: new Set(),
+    nativeLanguages: ['en'],
+    translateBackToUserLanguage: true
+});
+
+adapter.use(languageTranslator);
 
 
 //-----------------------------------------------
@@ -53,6 +67,7 @@ const homebotQna = new QnAMaker({
 const storage = new MemoryStorage();
 const conversationState = new ConversationState(storage);
 const userState = new UserState(storage);
+
 adapter.use(new BotStateSet(conversationState, userState));
 
 
@@ -87,12 +102,11 @@ server.post('/api/messages', (req, res) => {
 
         const activeFlow = cState.activeFlow === true;
 
+        console.log(context.activity.type);
 
         switch (context.activity.type) {
-            case 'message':
-                console.log('message');
+            case 'message': // Represents a communication between bot and user.
                 isMessage = true
-                // Represents a communication between bot and user.
                 if (!activeFlow) {
 
                     if (uState.userInfo === undefined) {
@@ -121,14 +135,9 @@ server.post('/api/messages', (req, res) => {
                     }
                 }
                 break;
-            case 'contactRelationUpdate':
-                // Indicates that the bot was added or removed from a user's contact list.
-                console.log('contactRelationUpdate');
+            case 'contactRelationUpdate': // Indicates that the bot was added or removed from a user's contact list.
                 break;
-            case 'conversationUpdate':
-                // Indicates that the bot was added to a conversation, other members were
-                // added to or removed from the conversation, or conversation metadata has changed.
-                console.log('conversationUpdate');
+            case 'conversationUpdate': // Indicates that the bot was added to a conversation, other members were added to or removed from the conversation, or conversation metadata has changed.
                 if (!activeFlow && context.activity.membersAdded[0].name !== 'Bot') {
                     if (uState.userInfo === undefined) {
                         await dc.begin('getUserInfo');
@@ -137,35 +146,19 @@ server.post('/api/messages', (req, res) => {
                     }
                 }
                 break;
-            case 'deleteUserData':
-                // Indicates to a bot that a user has requested that the bot delete any user data it may have stored.
-                console.log('deleteUserData');
+            case 'deleteUserData': // Indicates to a bot that a user has requested that the bot delete any user data it may have stored.
                 break;
-            case 'endOfConversation':
-                // Indicates the end of a conversation.
-                console.log('endOfConversation');
+            case 'endOfConversation': // Indicates the end of a conversation.
                 break;
-            case 'event':
-                // Represents a communication sent to a bot that is not visible to the user.
-                console.log('event');
+            case 'event': // Represents a communication sent to a bot that is not visible to the user.
                 break;
-            case 'invoke':
-                // Represents a communication sent to a bot to request that it perform a specific operation. 
-                console.log('invoke');
-                // This activity type is reserved for internal use by the Microsoft Bot Framework.
+            case 'invoke': // Represents a communication sent to a bot to request that it perform a specific operation. This activity type is reserved for internal use by the Microsoft Bot Framework.
                 break;
-            case 'messageReaction':
-                // Indicates that a user has reacted to an existing activity. 
-                console.log('messageReaction');
-                // For example, a user clicks the "Like" button on a message.
+            case 'messageReaction': // Indicates that a user has reacted to an existing activity. For example, a user clicks the "Like" button on a message.
                 break;
-            case 'ping':
-                // Represents an attempt to determine whether a bot's endpoint is accessible.
-                console.log('ping');
+            case 'ping': // Represents an attempt to determine whether a bot's endpoint is accessible.
                 break;
-            case 'typing':
-                // Indicates that the user or bot on the other end of the conversation is compiling a response.
-                console.log('typing');
+            case 'typing': // Indicates that the user or bot on the other end of the conversation is compiling a response.
                 break;
         }
 
