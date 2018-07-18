@@ -42,7 +42,7 @@ class GetUserInfo extends DialogContainer {
 
                 dc.activeDialog.state.userInfo = {}; // Clears any previous data
 
-                await dc.context.sendActivity(`Howdy 👋 , I'm HomeBot!`);
+                await dc.context.sendActivity(`Hello 👋 , I'm HomeBot!`);
                 await dc.prompt('userNamePrompt', `What should I call you?`);
             },
             async (dc, userName) => {
@@ -95,6 +95,7 @@ class PropertyMaintenance extends DialogContainer {
                     dc.activeDialog.state.maintenanceRequest.confirming = true;
 
                     await dc.context.sendActivity(`Hello, I understand your ${appliances[0]} requires maintenance for an issue described as: '${issues[0]}'`);
+                
                 } else {
                     await dc.context.sendActivity(`Hello, I understand require maintenance?`);
                 }

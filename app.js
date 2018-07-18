@@ -166,7 +166,7 @@ server.post('/api/messages', (req, res) => {
             console.log('continue...');
             await dc.continue();
             if (!context.responded && isMessage) {
-                await dc.context.sendActivity(`Howdy, I'm HomeBot! I can help with reporting issues, taking feedback and/or complaints, and answering questions about your home and the property.`);
+                await dc.context.sendActivity(`Hello, I'm HomeBot! I can help with reporting issues, taking feedback and/or complaints, and answering questions about your home and the property.`);
             }
         }        
     });
