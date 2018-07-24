@@ -106,6 +106,16 @@ server.post('/api/messages', (req, res) => {
 
         switch (context.activity.type) {
             case 'message': // Represents a communication between bot and user.
+
+                if (context.activity.text == "ChoicePrompt") {
+                    //  Initialize the message object.
+                    const basicMessage = MessageFactory.suggestedActions(['red', 'green', 'blue'], 'Choose a color');
+
+                    await context.sendActivity(basicMessage);
+
+                    return
+                }
+
                 isMessage = true
                 if (!activeFlow) {
 
